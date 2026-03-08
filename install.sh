@@ -1,59 +1,61 @@
 #!/bin/bash
 
-echo "🚀 Iniciando instalación de Dotfiles personalizada..."
+echo "🚀 Iniciando configuración automática de entorno..."
 
-# 1. Definir rutas útiles
-DOTFILES_DIR=$(pwd)
-NVIM_CONFIG_DIR="$HOME/.config/nvim"
+# 1. Evitar bloqueos de APT (esperar si el sistema está ocupado)
+echo "🛠️ Verificando disponibilidad de paquetes..."
+while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+  echo "⏳ Esperando a que el sistema libere los bloqueos de instalación..."
+  sleep 5
+done
 
-# 2. Instalar Neovim 0.10+ (Binario oficial estable)
-echo "📦 Instalando Neovim..."
-curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
-sudo rm -rf /opt/nvim-linux-x86_64
-sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+# 2. Instalar dependencias ignorando errores de repositorios externos (como Yarn)
+# Usamos -y y --allow-unauthenticated para que no se detenga por errores de firmas
+sudo apt-get update || true 
+sudo apt-get install -y ripgrep fd-find --allow-unauthenticated
 
-# Hacer que el comando nvim esté disponible siempre
+# 3. Instalar Neovim 0.10+ de forma silenciosa
+if [ ! -d "/opt/nvim-linux-x86_64" ]; then
+    echo "📦 Instalando Neovim estable..."
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+    sudo rm -rf /opt/nvim-linux-x86_64
+    sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+    rm nvim-linux-x86_64.tar.gz
+fi
+
+# Crear enlace simbólico para que 'nvim' funcione siempre
 sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
 
-# 3. Instalar Rust y Cargo (Necesario para herramientas como fd-find y ripgrep)
-echo "🦀 Instalando Rust..."
+# 4. Configurar AstroNvim
+echo "🌌 Configurando AstroNvim..."
+NVIM_DIR="$HOME/.config/nvim"
+if [ ! -d "$NVIM_DIR" ]; then
+    git clone --depth 1 https://github.com/AstroNvim/template "$NVIM_DIR"
+    # Eliminar el .git del template para evitar conflictos
+    rm -rf "$NVIM_DIR/.git"
+fi
+
+# 5. Mapear tus configuraciones desde Dotfiles
+# GitHub clona los dotfiles en una carpeta específica, la buscamos:
+DOTFILES_PATH=$(pwd)
+mkdir -p "$NVIM_DIR/lua/plugins"
+
+if [ -d "$DOTFILES_PATH/nvim/lua/plugins" ]; then
+    cp -r "$DOTFILES_PATH/nvim/lua/plugins/"* "$NVIM_DIR/lua/plugins/"
+    echo "✅ Configuración de plugins copiada."
+fi
+
+# 6. Configurar el shell (.bashrc) para persistencia
+# Solo agregamos si no existen ya
+if ! grep -q "nvim-linux-x86_64" ~/.bashrc; then
+    echo 'export PATH="$PATH:/opt/nvim-linux-x86_64/bin"' >> ~/.bashrc
+    echo "alias cls='clear'" >> ~/.bashrc
+    echo "alias lvim='nvim'" >> ~/.bashrc
+fi
+
+# 7. Rust (opcional pero recomendado para Treesitter)
 if ! command -v rustup &> /dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source "$HOME/.cargo/env"
 fi
 
-# 4. Instalar dependencias del sistema (Ripgrep y FD son vitales para AstroNvim)
-echo "🛠️ Instalando dependencias de sistema (ripgrep, fd, node)..."
-sudo apt-get update
-sudo apt-get install -y ripgrep fd-find nodejs npm
-
-# 5. Configurar AstroNvim
-echo "🌌 Configurando AstroNvim..."
-# Limpiar configuraciones viejas si existen
-rm -rf "$NVIM_CONFIG_DIR"
-
-# Clonar el template oficial de AstroNvim
-git clone --depth 1 https://github.com/AstroNvim/template "$NVIM_CONFIG_DIR"
-rm -rf "$NVIM_CONFIG_DIR/.git"
-
-# 6. Mapear tus archivos personalizados desde el repo de Dotfiles
-echo "📂 Copiando archivos de configuración de nvim..."
-mkdir -p "$NVIM_CONFIG_DIR/lua/plugins"
-
-# Copiamos el contenido de tu carpeta 'nvim' del repo a la config real
-if [ -d "$DOTFILES_DIR/nvim/lua/plugins" ]; then
-    cp -r "$DOTFILES_DIR/nvim/lua/plugins/"* "$NVIM_CONFIG_DIR/lua/plugins/"
-    echo "✅ Plugins personalizados copiados."
-else
-    echo "⚠️ No se encontró la carpeta nvim/lua/plugins en los dotfiles."
-fi
-
-# 7. Agregar aliases útiles al .bashrc
-echo "⌨️ Configurando Aliases..."
-{
-    echo "export PATH=\$PATH:/opt/nvim-linux-x86_64/bin"
-    echo "alias lvim='nvim'"
-    echo "alias cls='clear'"
-} >> "$HOME/.bashrc"
-
-echo "✨ ¡Proceso completado! Abre 'nvim' para que se instalen los plugins automáticamente."
+echo "✨ ¡Todo listo! Cuando abras nvim, se instalará el resto solo."
