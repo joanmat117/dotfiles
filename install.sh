@@ -59,3 +59,4 @@ if ! command -v rustup &> /dev/null; then
 fi
 
 echo "✨ ¡Todo listo! Cuando abras nvim, se instalará el resto solo."
+sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
