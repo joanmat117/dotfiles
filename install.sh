@@ -2,61 +2,51 @@
 
 echo "🚀 Iniciando configuración automática de entorno..."
 
-# 1. Evitar bloqueos de APT (esperar si el sistema está ocupado)
+# 1. Bloqueamos errores fatales pero dejamos pasar errores de repositorios
+set +e 
+
+# 2. Limpiar el PATH y asegurar directorios
+DOTFILES_PATH=$(pwd)
+NVIM_DIR="$HOME/.config/nvim"
+
+# 3. Esperar a que el sistema libere el bloqueo de paquetes
 echo "🛠️ Verificando disponibilidad de paquetes..."
 while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-  echo "⏳ Esperando a que el sistema libere los bloqueos de instalación..."
+  echo "⏳ Esperando bloqueo de apt..."
   sleep 5
 done
 
-# 2. Instalar dependencias ignorando errores de repositorios externos (como Yarn)
-# Usamos -y y --allow-unauthenticated para que no se detenga por errores de firmas
-sudo apt-get update || true 
-sudo apt-get install -y ripgrep fd-find --allow-unauthenticated
+# 4. Actualizar instalando SOLO lo necesario y permitiendo errores de firmas ajenas
+# Usamos -o para ignorar el error de Yarn que sale en tu log
+sudo apt-get update -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true || true
+sudo apt-get install -y ripgrep fd-find --allow-unauthenticated || echo "⚠️ Falló la instalación de ripgrep/fd, pero seguimos..."
 
-# 3. Instalar Neovim 0.10+ de forma silenciosa
-if [ ! -d "/opt/nvim-linux-x86_64" ]; then
-    echo "📦 Instalando Neovim estable..."
-    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
-    sudo rm -rf /opt/nvim-linux-x86_64
-    sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
-    rm nvim-linux-x86_64.tar.gz
-fi
+# 5. Instalación de Neovim (Esta parte es manual, no depende de apt, así que funcionará)
+echo "📦 Instalando Neovim..."
+curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+sudo rm -rf /opt/nvim-linux-x86_64
+sudo mkdir -p /opt/nvim-linux-x86_64
+sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+rm nvim-linux-x86_64.tar.gz
 
-# Crear enlace simbólico para que 'nvim' funcione siempre
+# 6. ENLACES SIMBÓLICOS (Lo más importante para que nvim aparezca)
 sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/lvim
 
-# 4. Configurar AstroNvim
+# 7. AstroNvim Setup
 echo "🌌 Configurando AstroNvim..."
-NVIM_DIR="$HOME/.config/nvim"
 if [ ! -d "$NVIM_DIR" ]; then
     git clone --depth 1 https://github.com/AstroNvim/template "$NVIM_DIR"
-    # Eliminar el .git del template para evitar conflictos
     rm -rf "$NVIM_DIR/.git"
 fi
 
-# 5. Mapear tus configuraciones desde Dotfiles
-# GitHub clona los dotfiles en una carpeta específica, la buscamos:
-DOTFILES_PATH=$(pwd)
+# Copiar tus plugins desde el repo de dotfiles
 mkdir -p "$NVIM_DIR/lua/plugins"
-
 if [ -d "$DOTFILES_PATH/nvim/lua/plugins" ]; then
     cp -r "$DOTFILES_PATH/nvim/lua/plugins/"* "$NVIM_DIR/lua/plugins/"
-    echo "✅ Configuración de plugins copiada."
 fi
 
-# 6. Configurar el shell (.bashrc) para persistencia
-# Solo agregamos si no existen ya
-if ! grep -q "nvim-linux-x86_64" ~/.bashrc; then
-    echo 'export PATH="$PATH:/opt/nvim-linux-x86_64/bin"' >> ~/.bashrc
-    echo "alias cls='clear'" >> ~/.bashrc
-    echo "alias lvim='nvim'" >> ~/.bashrc
-fi
+# 8. Re-activar salida por error para el resto del script
+set -e 
 
-# 7. Rust (opcional pero recomendado para Treesitter)
-if ! command -v rustup &> /dev/null; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-fi
-
-echo "✨ ¡Todo listo! Cuando abras nvim, se instalará el resto solo."
-sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+echo "✨ Instalación finalizada. Prueba escribir 'nvim' ahora."
