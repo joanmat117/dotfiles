@@ -75,10 +75,6 @@ cat > ~/.config/opencode/config.json << 'EOF'
 {
   "theme": {
     "disableAnimations": true
-  },
-  "editor": {
-    "cursorBlink": false,
-    "smoothScrolling": false
   }
 }
 EOF
