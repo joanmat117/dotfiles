@@ -59,7 +59,6 @@ set -g status-interval 5
 set -g monitor-activity off
 set -g visual-bell off
 set -g bell-action none
-set -g refresh-client-interval 5
 setw -g synchronize-panes off
 set -g history-limit 2000
 bind C-c run "tmux save-buffer - | pbcopy"
