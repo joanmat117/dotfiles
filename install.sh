@@ -49,4 +49,38 @@ fi
 # 8. Re-activar salida por error para el resto del script
 set -e 
 
-echo "✨ Instalación finalizada. Prueba escribir 'nvim' ahora."
+# Instalar tmux
+sudo apt install tmux -y
+
+# Configurar tmux para ahorro de datos
+cat >> ~/.tmux.conf << 'EOF'
+set -g set-clipboard off
+set -g status-interval 5
+set -g monitor-activity off
+set -g visual-bell off
+set -g bell-action none
+set -g refresh-client-interval 5
+setw -g synchronize-panes off
+set -g history-limit 2000
+bind C-c run "tmux save-buffer - | pbcopy"
+set -g status-right "#[fg=green]🔒 #[fg=white]compressed"
+EOF
+
+# Instalar opencode
+curl -fsSL https://opencode.ai/install | bash
+
+# Desactivar animaciones de opencode
+mkdir -p ~/.config/opencode
+cat > ~/.config/opencode/config.json << 'EOF'
+{
+  "theme": {
+    "disableAnimations": true
+  },
+  "editor": {
+    "cursorBlink": false,
+    "smoothScrolling": false
+  }
+}
+EOF
+
+echo "✅ Listo. Prueba 'tmux' luego 'nvim'."
